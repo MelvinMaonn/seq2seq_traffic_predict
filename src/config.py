@@ -1,10 +1,14 @@
 
-batch_size      = 128
-in_seq_length   = 4 * 24
-out_seq_length  = 4 * 2
+batch_size      = 64
+#in_seq_length   = 4 * 24
+in_seq_length   = 12
+#out_seq_length  = 4 * 2
+out_seq_length  = 1
 num_neighbour   = 10
 
-dim_hidden      = 128
+
+
+dim_hidden      = 512
 query_dim_hidden = 128
 # dim_hidden      = 64
 # query_dim_hidden = 32
@@ -13,6 +17,8 @@ dim_features_info = 131
 dim_features_time = 6
 dim_features    = dim_features_info + dim_features_time
 
+road_num = 655
+
 full_length     = 61 * 24 * 4
 valid_length    = 2900
 
@@ -20,7 +26,7 @@ start_id        = 100
 pad_id          = 0
 end_id          = 101
 
-epoch           = 100
+epoch           = 20
 save_p_epoch    = 5
 test_p_epoch    = 5
 

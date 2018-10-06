@@ -2,10 +2,10 @@
 import pickle
 import queue
 import numpy as np
-import progressbar
+#import progressbar
 
 import src.config as config
-
+'''
 def find_neighbours(predecessor=5, successors=5):
 
     event_filter_file = open(config.data_path + "event_filter.txt", "r")
@@ -105,7 +105,7 @@ def find_neighbours(predecessor=5, successors=5):
             outfile.write(str(fulllist))
             outfile.write("\n")
     outfile.close()
-
+'''
 def load_data(predecessor=5, successors=5):
     print("Loading data...")
     # traffic_data_file = open(config.data_path + "event_traffic_completion_beijing_15min_filtfilt_0.05.pkl", "rb")
@@ -287,6 +287,25 @@ def get_minibatch_all(root_data, order, num_seq):
 
     minibatch_decode_seq[:, 1: ,:] = minibatch_y_root
     minibatch_target_seq[:, :-1 ,:] = minibatch_y_root
+
+    minibatch_decode_seq[:, 0, :] = config.start_id
+    minibatch_target_seq[:, -1, :] = config.end_id
+
+    return minibatch_x_root, minibatch_decode_seq, minibatch_target_seq
+
+def get_train_data(root_data, start):
+    minibatch_x_root = np.zeros(shape=[config.batch_size, config.in_seq_length, config.road_num])
+    minibatch_y_root = np.zeros(shape=[config.batch_size, config.out_seq_length, config.road_num])
+
+    for i in range(config.batch_size):
+        minibatch_x_root[i] = root_data[start+i : start+i+config.in_seq_length]
+        minibatch_y_root[i] = root_data[start+i+config.in_seq_length : start+i+config.in_seq_length+config.out_seq_length]
+
+    minibatch_decode_seq = np.zeros((minibatch_y_root.shape[0], minibatch_y_root.shape[1] + 1, minibatch_y_root.shape[2]))
+    minibatch_target_seq = np.zeros((minibatch_y_root.shape[0], minibatch_y_root.shape[1] + 1, minibatch_y_root.shape[2]))
+
+    minibatch_decode_seq[:, 1:, :] = minibatch_y_root
+    minibatch_target_seq[:, :-1, :] = minibatch_y_root
 
     minibatch_decode_seq[:, 0, :] = config.start_id
     minibatch_target_seq[:, -1, :] = config.end_id

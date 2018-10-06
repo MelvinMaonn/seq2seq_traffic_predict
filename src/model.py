@@ -33,7 +33,7 @@ class Spacial_Model():
     def __create_placeholders__(self):
         self.x_root = tf.placeholder(
             dtype=tf.float32,
-            shape=[config.batch_size, config.in_seq_length, 1],
+            shape=[config.batch_size, config.in_seq_length, config.road_num],
             name='input_x_root'
         )
         self.x_neighbour = tf.placeholder(
@@ -43,7 +43,7 @@ class Spacial_Model():
         )
         self.decode_seqs = tf.placeholder(
             dtype=tf.float32,
-            shape=[config.batch_size, config.out_seq_length + 1, 1], # start_id at beginning
+            shape=[config.batch_size, config.out_seq_length + 1, config.road_num], # start_id at beginning
             name="decode_root_seqs"
         )
         self.decode_seqs_test = tf.placeholder(
@@ -53,7 +53,7 @@ class Spacial_Model():
         )
         self.target_seqs = tf.placeholder(
             dtype=tf.float32,
-            shape=[config.batch_size, config.out_seq_length + 1, 1], # end_id at end
+            shape=[config.batch_size, config.out_seq_length + 1, config.road_num], # end_id at end
             name="target_root_seqs"
         )
         self.global_step = tf.placeholder(
@@ -85,31 +85,35 @@ class Spacial_Model():
 
     def __create_loss__(self):
         self.mae_copy = tl.cost.absolute_difference_error(
-            tf.slice(self.x_root, [0, config.in_seq_length - config.out_seq_length, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
+            tf.slice(self.x_root, [0, config.in_seq_length - config.out_seq_length, 0], [config.batch_size, config.out_seq_length, config.road_num]),
+            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
             is_mean=True
         )
         # train loss
         self.nmse_train_loss = tl.cost.normalized_mean_square_error(self.train_net.outputs, self.target_seqs)
         self.nmse_train_noend = tl.cost.normalized_mean_square_error(
-            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1])
+            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
+            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num])
         )
         self.mse_train_noend = tl.cost.mean_squared_error(
-            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
+            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
+            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
             is_mean=True
         )
+        '''
         self.mae_train_noend = tl.cost.absolute_difference_error(
-            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
+            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
+            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
             is_mean=True
         )
+        '''
+        self.mae_train_noend = tf.reduce_mean(tf.abs(tf.reshape(self.train_net.outputs, [-1]) - tf.reshape(self.target_seqs, [-1])))
         self.mape_train_noend = self.__get_mape__(
-            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1])
+            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
+            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num])
         )
         # test loss
+        '''
         self.nmse_test_loss = tl.cost.normalized_mean_square_error(self.test_net.outputs, self.target_seqs)
         self.nmse_test_noend = tl.cost.normalized_mean_square_error(
             tf.slice(self.test_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
@@ -129,9 +133,10 @@ class Spacial_Model():
             tf.slice(self.test_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
             tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1])
         )
+        '''
         # adaptive train loss
         self.train_loss = self.nmse_train_loss
-        self.test_loss = self.nmse_test_loss
+        # self.test_loss = self.nmse_test_loss
 
     def __create_training_op__(self):
         self.learning_rate = tf.train.exponential_decay(
@@ -143,7 +148,7 @@ class Spacial_Model():
             name="learning_rate"
         )
         all_vars = tl.layers.get_variables_with_name(self.model_name)
-        self.optim = tf.train.AdamOptimizer(self.learning_rate, beta1=0.5) \
+        self.optim = tf.train.AdamOptimizer(self.learning_rate) \
             .minimize(self.train_loss, var_list=all_vars)
 
     def __get_network__(self, encode_seq, neighbour_seq, decode_seq, is_train=True, reuse=False):
@@ -184,9 +189,9 @@ class Spacial_Model():
             # net_out = DenseLayer(net_rnn, n_units=64, act=tf.identity, name='dense1')
             net_out = DenseLayer(net_rnn, n_units=1, act=tf.identity, name='dense2')
             if is_train:
-                net_out = ReshapeLayer(net_out, (config.batch_size, config.out_seq_length + 1, 1), name="reshape_out")
+                net_out = ReshapeLayer(net_out, (config.batch_size, config.out_seq_length + 1, config.road_num), name="reshape_out")
             else:
-                net_out = ReshapeLayer(net_out, (config.batch_size, 1, 1), name="reshape_out")
+                net_out = ReshapeLayer(net_out, (config.batch_size, 1, config.road_num), name="reshape_out")
 
             self.net_rnn = net_rnn
 
@@ -201,12 +206,14 @@ class Seq2Seq_Model(Spacial_Model):
             is_train=True,
             reuse=False,
         )
+        '''
         self.test_net = self.__get_network__(
             self.x_root,
             self.decode_seqs_test,
             is_train=False,
             reuse=True,
         )
+        '''
         self.train_net.print_params(False)
         self.train_net.print_layers()
 
@@ -230,16 +237,16 @@ class Seq2Seq_Model(Spacial_Model):
                 initial_state_encode=None,
                 # dropout=(0.8 if is_train else None),
                 dropout=None,
-                n_layer=1,
+                n_layer=2,
                 return_seq_2d=True,
                 name='seq2seq'
             )
             # net_out = DenseLayer(net_rnn, n_units=64, act=tf.identity, name='dense1')
-            net_out = DenseLayer(net_rnn, n_units=1, act=tf.identity, name='dense2')
+            net_out = DenseLayer(net_rnn, n_units=config.road_num, act=tf.identity, name='dense2')
             if is_train:
-                net_out = ReshapeLayer(net_out, (config.batch_size, config.out_seq_length + 1, 1), name="reshape_out")
+                net_out = ReshapeLayer(net_out, (config.batch_size, config.out_seq_length + 1, config.road_num), name="reshape_out")
             else:
-                net_out = ReshapeLayer(net_out, (config.batch_size, 1, 1), name="reshape_out")
+                net_out = ReshapeLayer(net_out, (config.batch_size, 1, config.road_num), name="reshape_out")
 
             self.net_rnn = net_rnn
 

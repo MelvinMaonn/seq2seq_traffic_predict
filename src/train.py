@@ -21,6 +21,8 @@ import src.utils as utils
 import src.config as config
 import src.dataloader as dataloader
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '6'
+
 
 class Controller():
 
@@ -319,25 +321,32 @@ class Seq2Seq_Controller(Controller):
 
     def __train__(self, epoch, root_data, logger):
 
+        '''
         each_num_seq = root_data.shape[1] - (config.in_seq_length + config.out_seq_length) + 1
         total_batch_size = root_data.shape[0] * each_num_seq
         train_order = list(range(total_batch_size))
         random.shuffle(train_order)
         train_order = train_order[:config.batch_size * 1000]
+        '''
 
         all_loss = np.zeros(7)
 
         start_time = time.time()
         step_time = time.time()
-        train_steps = len(train_order) // config.batch_size
+        #train_steps = len(train_order) // config.batch_size
+        train_steps = (len(root_data) - config.in_seq_length - config.out_seq_length + 1) // config.batch_size
 
         for cstep in range(train_steps):
 
+            '''
             x_root, decode_seq, target_seq = dataloader.get_minibatch_all(
                 root_data,
                 order=train_order[cstep * config.batch_size : (cstep + 1) * config.batch_size],
                 num_seq=each_num_seq
             )
+            '''
+
+            x_root, decode_seq, target_seq = dataloader.get_train_data(root_data, cstep * config.batch_size)
 
             global_step = cstep + epoch * train_steps
 
@@ -360,7 +369,7 @@ class Seq2Seq_Controller(Controller):
 
             all_loss += np.array(results[:-2])
 
-            if cstep % 100 == 0 and cstep > 0:
+            if cstep % 60 == 0 and cstep > 0:
                 print(
                     "[Train] Epoch: [%3d][%4d/%4d] time: %.4f, lr: %.8f, loss: %s" %
                     (epoch, cstep, train_steps, time.time() - step_time, results[-2], all_loss / (cstep + 1))
@@ -511,8 +520,9 @@ class Seq2Seq_Controller(Controller):
 
     def controller_train(self, tepoch=config.epoch):
         # root_data, pathlist  = dataloader.load_data_all()
-        root_data, neighbour_data, pathlist  = dataloader.load_data(5, 5)
-        del neighbour_data
+        # root_data, neighbour_data, pathlist  = dataloader.load_data(5, 5)
+        # del neighbour_data
+        root_data = np.genfromtxt('/mnt/data1/mm/cnn_traffic_prediction/data/800r_train.txt')
 
         last_save_epoch = self.base_epoch
         global_epoch = self.base_epoch + 1
@@ -533,7 +543,8 @@ class Seq2Seq_Controller(Controller):
 
         for epoch in range(tepoch + 1):
 
-            self.__train__(global_epoch, root_data[:, :-config.valid_length, :], logger_train)
+            # self.__train__(global_epoch, root_data[:, :-config.valid_length, :], logger_train)
+            self.__train__(global_epoch, root_data, logger_train)
 
             '''
             if epoch % config.test_p_epoch == 0:
@@ -602,10 +613,10 @@ if __name__ == "__main__":
         mdl = model.Seq2Seq_Model(
             model_name="seq2seq_model",
             start_learning_rate=0.001,
-            decay_steps=2e4,
-            decay_rate=0.5,
+            decay_steps=1400,
+            decay_rate=0.9,
         )
-        ctl = Seq2Seq_Controller(model=mdl, base_epoch=100)
+        ctl = Seq2Seq_Controller(model=mdl, base_epoch=-1)
         ctl.controller_train()
         # ctl.controller_test()
         ctl.sess.close()
