@@ -10,6 +10,7 @@ from tensorlayer.layers import \
     SubpixelConv2d, Seq2Seq, ExpandDimsLayer, TileLayer
 
 import src.config as config
+import lib.metrics as metrics
 
 class Spacial_Model():
 
@@ -91,52 +92,33 @@ class Spacial_Model():
         )
         # train loss
         self.nmse_train_loss = tl.cost.normalized_mean_square_error(self.train_net.outputs, self.target_seqs)
-        self.nmse_train_noend = tl.cost.normalized_mean_square_error(
-            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num])
-        )
-        self.mse_train_noend = tl.cost.mean_squared_error(
-            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
-            is_mean=True
-        )
-        '''
-        self.mae_train_noend = tl.cost.absolute_difference_error(
-            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
-            is_mean=True
-        )
-        '''
-        self.mae_train_noend = tf.reduce_mean(tf.abs(tf.reshape(self.train_net.outputs, [-1]) - tf.reshape(self.target_seqs, [-1])))
-        self.mape_train_noend = self.__get_mape__(
-            tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num])
-        )
+
+        outputs_noend = tf.slice(self.train_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num])
+        target_seqs_noend = tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, config.road_num])
+        self.nmse_train_noend = tl.cost.normalized_mean_square_error(outputs_noend, target_seqs_noend)
+
+        preds = tf.reshape(outputs_noend, [-1])
+        labels = tf.reshape(target_seqs_noend, [-1])
+        self.rmse_train_noend = metrics.masked_rmse_tf(preds, labels, 0)
+        # self.mae_train_noend = tf.reduce_mean(tf.abs(tf.reshape(self.train_net.outputs, [-1]) - tf.reshape(self.target_seqs, [-1])))
+        self.mae_train_noend = metrics.masked_mae_tf(tf.reshape(self.train_net.outputs, [-1]), tf.reshape(self.target_seqs, [-1]), 0)
+        self.mape_train_noend = metrics.masked_mape_tf(preds, labels, 0)
         # test loss
         '''
         self.nmse_test_loss = tl.cost.normalized_mean_square_error(self.test_net.outputs, self.target_seqs)
-        self.nmse_test_noend = tl.cost.normalized_mean_square_error(
-            tf.slice(self.test_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1])
-        )
-        self.mse_test_noend = tl.cost.mean_squared_error(
-            tf.slice(self.test_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            is_mean=True
-        )
-        self.mae_test_noend = tl.cost.absolute_difference_error(
-            tf.slice(self.test_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            is_mean=True
-        )
-        self.mape_test_noend = self.__get_mape__(
-            tf.slice(self.test_net.outputs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1]),
-            tf.slice(self.target_seqs, [0, 0, 0], [config.batch_size, config.out_seq_length, 1])
-        )
+        self.nmse_test_noend = tl.cost.normalized_mean_square_error(outputs_noend, target_seqs_noend)
+        self.rmse_test_noend = metrics.masked_rmse_tf(preds, labels, 0)
+        self.mae_test_noend = metrics.masked_mae_tf(tf.reshape(self.train_net.outputs, [-1]), tf.reshape(self.target_seqs, [-1]), 0)
+        self.mape_test_noend = metrics.masked_mape_tf(preds, labels, 0)
         '''
+        self.nmse_test_loss = self.nmse_train_loss
+        self.nmse_test_noend = self.nmse_train_noend
+        self.rmse_test_noend = self.rmse_train_noend
+        self.mae_test_noend = self.mae_train_noend
+        self.mape_test_noend = self.mape_train_noend
         # adaptive train loss
         self.train_loss = self.nmse_train_loss
-        # self.test_loss = self.nmse_test_loss
+        self.test_loss = self.nmse_test_loss
 
     def __create_training_op__(self):
         self.learning_rate = tf.train.exponential_decay(

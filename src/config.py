@@ -26,7 +26,7 @@ start_id        = 100
 pad_id          = 0
 end_id          = 101
 
-epoch           = 20
+epoch           = 50
 save_p_epoch    = 5
 test_p_epoch    = 5
 

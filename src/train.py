@@ -21,7 +21,7 @@ import src.utils as utils
 import src.config as config
 import src.dataloader as dataloader
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '6'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 
 
 class Controller():
@@ -92,7 +92,7 @@ class Controller():
                 self.model.train_loss,
                 self.model.nmse_train_loss,
                 self.model.nmse_train_noend,
-                self.model.mse_train_noend,
+                self.model.rmse_train_noend,
                 self.model.mae_train_noend,
                 self.model.mape_train_noend,
                 self.model.learning_rate,
@@ -149,7 +149,7 @@ class Controller():
                 self.model.test_loss,
                 self.model.nmse_test_loss,
                 self.model.nmse_test_noend,
-                self.model.mse_test_noend,
+                self.model.rmse_test_noend,
                 self.model.mae_test_noend,
                 self.model.mape_test_noend],
                 feed_dict={
@@ -271,7 +271,7 @@ class Controller():
                 global_step=last_save_epoch
             )
 
-        logger_train = log.Logger(columns=["mae_copy", "loss", "nmse_train", "nmse", "mse", "mae", "mape"])
+        logger_train = log.Logger(columns=["mae_copy", "loss", "nmse_train", "nmse", "rmse", "mae", "mape"])
         # logger_valid = log.Logger(columns=["mae_copy", "lossv", "nmse_test", "nmsev", "msev", "maev", "mapev"])
         # logger_test = log.Logger(columns=["mae_copy", "lossv", "nmse_test", "nmsev", "msev", "maev", "mapev"] + list(range(15, 121, 15)))
         logger_test = log.Logger(columns=["mapev"] + list(range(15, 121, 15)))
@@ -321,30 +321,13 @@ class Seq2Seq_Controller(Controller):
 
     def __train__(self, epoch, root_data, logger):
 
-        '''
-        each_num_seq = root_data.shape[1] - (config.in_seq_length + config.out_seq_length) + 1
-        total_batch_size = root_data.shape[0] * each_num_seq
-        train_order = list(range(total_batch_size))
-        random.shuffle(train_order)
-        train_order = train_order[:config.batch_size * 1000]
-        '''
-
         all_loss = np.zeros(7)
 
         start_time = time.time()
         step_time = time.time()
-        #train_steps = len(train_order) // config.batch_size
         train_steps = (len(root_data) - config.in_seq_length - config.out_seq_length + 1) // config.batch_size
 
         for cstep in range(train_steps):
-
-            '''
-            x_root, decode_seq, target_seq = dataloader.get_minibatch_all(
-                root_data,
-                order=train_order[cstep * config.batch_size : (cstep + 1) * config.batch_size],
-                num_seq=each_num_seq
-            )
-            '''
 
             x_root, decode_seq, target_seq = dataloader.get_train_data(root_data, cstep * config.batch_size)
 
@@ -355,7 +338,7 @@ class Seq2Seq_Controller(Controller):
                 self.model.train_loss,
                 self.model.nmse_train_loss,
                 self.model.nmse_train_noend,
-                self.model.mse_train_noend,
+                self.model.rmse_train_noend,
                 self.model.mae_train_noend,
                 self.model.mape_train_noend,
                 self.model.learning_rate,
@@ -364,7 +347,7 @@ class Seq2Seq_Controller(Controller):
                     self.model.x_root: x_root,
                     self.model.decode_seqs: decode_seq,
                     self.model.target_seqs: target_seq,
-                    self.model.global_step: global_step,
+                    self.model.global_step: global_step
                 })
 
             all_loss += np.array(results[:-2])
@@ -387,30 +370,24 @@ class Seq2Seq_Controller(Controller):
 
     def __valid__(self, epoch, root_data, logger):
 
-        each_num_seq = root_data.shape[1] - (config.in_seq_length + config.out_seq_length) + 1
-        total_batch_size = root_data.shape[0] * each_num_seq
-        train_order = list(range(total_batch_size))
-
         all_loss = np.zeros(7)
 
         start_time = time.time()
         step_time = time.time()
-        valid_steps = total_batch_size // config.batch_size
+        valid_steps = (len(root_data) - config.in_seq_length - config.out_seq_length + 1) // config.batch_size
 
         for cstep in range(valid_steps):
 
-            x_root, decode_seq, target_seq = dataloader.get_minibatch_all(
-                root_data,
-                order=train_order[cstep * config.batch_size : (cstep + 1) * config.batch_size],
-                num_seq=each_num_seq
-            )
+            x_root, decode_seq, target_seq = dataloader.get_train_data(root_data, cstep * config.batch_size)
+
+            global_step = cstep + epoch * valid_steps
 
             results = self.sess.run([
                 self.model.mae_copy,
                 self.model.test_loss,
                 self.model.nmse_test_loss,
                 self.model.nmse_test_noend,
-                self.model.mse_test_noend,
+                self.model.rmse_test_noend,
                 self.model.mae_test_noend,
                 self.model.mape_test_noend],
                 feed_dict={
@@ -519,10 +496,8 @@ class Seq2Seq_Controller(Controller):
         return all_loss, time_loss, pathpred
 
     def controller_train(self, tepoch=config.epoch):
-        # root_data, pathlist  = dataloader.load_data_all()
-        # root_data, neighbour_data, pathlist  = dataloader.load_data(5, 5)
-        # del neighbour_data
-        root_data = np.genfromtxt('/mnt/data1/mm/cnn_traffic_prediction/data/800r_train.txt')
+        train_data = np.genfromtxt('../data/800r_train_2.txt')
+        val_data = np.genfromtxt('../data/800r_test.txt')
 
         last_save_epoch = self.base_epoch
         global_epoch = self.base_epoch + 1
@@ -536,21 +511,18 @@ class Seq2Seq_Controller(Controller):
             # return
 
         # logger_train = log.Logger(columns=["mae_copy", "loss", "nmse_train", "nmse", "mse", "mae", "mape", "lossv", "nmse_test", "nmsev", "msev", "maev", "mapev"])
-        logger_train = log.Logger(columns=["mae_copy", "loss", "nmse_train", "nmse", "mse", "mae", "mape"])
-        # logger_valid = log.Logger(columns=["mae_copy", "lossv", "nmse_test", "nmsev", "msev", "maev", "mapev"])
+        logger_train = log.Logger(columns=["mae_copy", "loss", "nmse_train", "nmse", "rmse", "mae", "mape"])
+        logger_valid = log.Logger(columns=["mae_copy", "lossv", "nmse_test", "nmsev", "rmsev", "maev", "mapev"])
         # logger_test = log.Logger(columns=["mae_copy", "lossv", "nmse_test", "nmsev", "msev", "maev", "mapev"] + list(range(15, 121, 15)))
-        logger_test = log.Logger(columns=["mapev"] + list(range(15, 121, 15)))
+        # logger_test = log.Logger(columns=["mapev"] + list(range(15, 121, 15)))
 
         for epoch in range(tepoch + 1):
 
-            # self.__train__(global_epoch, root_data[:, :-config.valid_length, :], logger_train)
-            self.__train__(global_epoch, root_data, logger_train)
+            self.__train__(global_epoch, train_data, logger_train)
 
-            '''
             if epoch % config.test_p_epoch == 0:
-                # self.__valid__(global_epoch, root_data[:, -config.valid_length:, :], logger_valid)
-                self.__test__(global_epoch, root_data[:, -config.valid_length:, :], logger_test, pathlist)
-            '''
+                self.__valid__(global_epoch, val_data, logger_valid)
+                # self.__test__(global_epoch, root_data[:, -config.valid_length:, :], logger_test, pathlist)
 
             if global_epoch > self.base_epoch and global_epoch % config.save_p_epoch == 0:
                 self.save_model(
@@ -560,8 +532,8 @@ class Seq2Seq_Controller(Controller):
                 last_save_epoch = global_epoch
 
             logger_train.save(self.log_save_dir + config.global_start_time + "_train.csv")
-            # logger_valid.save(self.log_save_dir + config.global_start_time + "_valid.csv")
-            logger_test.save(self.log_save_dir + config.global_start_time + "_test.csv")
+            logger_valid.save(self.log_save_dir + config.global_start_time + "_valid.csv")
+            # logger_test.save(self.log_save_dir + config.global_start_time + "_test.csv")
 
             global_epoch += 1
 
