@@ -6,7 +6,7 @@ in_seq_length   = 12
 out_seq_length  = 1
 num_neighbour   = 10
 
-
+pred_time = 30
 
 dim_hidden      = 512
 query_dim_hidden = 128

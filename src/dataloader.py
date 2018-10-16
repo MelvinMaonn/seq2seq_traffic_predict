@@ -5,107 +5,7 @@ import numpy as np
 #import progressbar
 
 import src.config as config
-'''
-def find_neighbours(predecessor=5, successors=5):
 
-    event_filter_file = open(config.data_path + "event_filter.txt", "r")
-    event_filter_flag = eval(event_filter_file.readline())
-    event_filter_file.close()
-
-    event_set_file = open(config.data_path + "event_link_set_beijing_1km", "r")
-    event_set = event_set_file.readlines()
-    event_set_file.close()
-
-    event_link_file = open(config.result_path + "event_link_set_beijing_link_1km.txt", "r")
-    event_link = event_link_file.readlines()
-    event_link_file.close()
-
-    event_pagerank_file = open(config.result_path + "pagerank_1km.txt", "r")
-    event_pagerank = event_pagerank_file.readlines()
-    event_pagerank_file.close()
-
-    # traffic_data_file = open(config.data_path + "event_traffic_completion_beijing_15min.pkl", "rb")
-    # traffic_data_file = open(config.data_path + "event_traffic_beijing_mv_avg_15min_completion.pkl", "rb")
-    # traffic_data_file = open(config.data_path + "event_traffic_beijing_1km_mv_avg_15min.pkl", "rb")
-    traffic_data_file = open(config.data_path + "event_traffic_beijing_1km_mv_avg_15min_completion.pkl", "rb")
-    traffic_data = pickle.load(traffic_data_file, encoding='latin1')
-    traffic_data_file.close()
-
-    outfile = open(config.result_path + "neighbours_1km.txt", "w")
-
-    assert len(event_filter_flag) == len(event_set)
-    assert len(event_filter_flag) == len(event_link)
-    assert len(event_filter_flag) == len(event_pagerank)
-
-    save_dict = dict()
-
-    bar = progressbar.ProgressBar(max_value=1151)
-    for iter, line in enumerate(event_set):
-        bar.update(iter)
-
-        if event_filter_flag[iter] == 0:
-            continue
-        nodes = line.replace("\n", "").split("\t")
-
-        def get_dict(links):
-            ldict = dict()
-            llist = eval(links)
-            for l in llist:
-                if l[2] != 1:
-                    continue
-                if l[0] not in ldict:
-                    ldict[l[0]] = {"prev": list(), "next": list()}
-                if l[1] not in ldict:
-                    ldict[l[1]] = {"prev": list(), "next": list()}
-                ldict[l[0]]["next"].append(l[1])
-                ldict[l[1]]["prev"].append(l[0])
-            return ldict
-
-        link_dict = get_dict(event_link[iter])
-
-        for node in nodes:
-            if node not in traffic_data:
-                continue
-
-            def get_neighbours(root, num, direction):
-                assert direction == "prev" or direction == "next"
-                qnode = queue.Queue()
-                qnode.put(root)
-                reslist = list()
-                while len(reslist) < num and not qnode.empty():
-                    cur = qnode.get()
-                    if cur not in traffic_data:
-                        continue
-                    if cur in link_dict:
-                        for n in link_dict[cur][direction]:
-                            qnode.put(n)
-                    if cur != root:
-                        reslist.append(cur)
-                return reslist
-
-            prevlist = get_neighbours(node, predecessor, "prev")
-            nextlist = get_neighbours(node, successors, "next")
-
-            if len(prevlist) < predecessor or len(nextlist) < successors:
-                continue
-
-            fulllist = [node]
-            fulllist += prevlist
-            fulllist += nextlist
-
-            key = ""
-            for ele in fulllist:
-                key += ele + "_"
-            if key in save_dict:
-                continue
-            save_dict[key] = 1
-
-            # print(fulllist)
-
-            outfile.write(str(fulllist))
-            outfile.write("\n")
-    outfile.close()
-'''
 def load_data(predecessor=5, successors=5):
     print("Loading data...")
     # traffic_data_file = open(config.data_path + "event_traffic_completion_beijing_15min_filtfilt_0.05.pkl", "rb")
@@ -299,7 +199,7 @@ def get_train_data(root_data, start):
 
     for i in range(config.batch_size):
         minibatch_x_root[i] = root_data[start+i : start+i+config.in_seq_length]
-        minibatch_y_root[i] = root_data[start+i+config.in_seq_length : start+i+config.in_seq_length+config.out_seq_length]
+        minibatch_y_root[i] = root_data[start+i+config.in_seq_length+config.pred_time-1 : start+i+config.in_seq_length+config.pred_time-1+config.out_seq_length]
 
     minibatch_decode_seq = np.zeros((minibatch_y_root.shape[0], minibatch_y_root.shape[1] + 1, minibatch_y_root.shape[2]))
     minibatch_target_seq = np.zeros((minibatch_y_root.shape[0], minibatch_y_root.shape[1] + 1, minibatch_y_root.shape[2]))
