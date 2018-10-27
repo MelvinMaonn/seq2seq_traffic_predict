@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 # import seaborn as sns
 import time
 import numpy as np
+import pandas as pd
 import sklearn
 import random
 import sklearn.utils
@@ -21,7 +22,7 @@ import src.utils as utils
 import src.config as config
 import src.dataloader as dataloader
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '4'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 
 class Controller():
@@ -376,6 +377,8 @@ class Seq2Seq_Controller(Controller):
         step_time = time.time()
         valid_steps = (len(root_data) - config.in_seq_length - config.out_seq_length + 1) // config.batch_size
 
+        prediction = open("../prediction/" + config.global_start_time + "_prediction.txt", 'w')
+
         for cstep in range(valid_steps):
 
             x_root, decode_seq, target_seq = dataloader.get_train_data(root_data, cstep * config.batch_size)
@@ -389,7 +392,8 @@ class Seq2Seq_Controller(Controller):
                 self.model.nmse_test_noend,
                 self.model.rmse_test_noend,
                 self.model.mae_test_noend,
-                self.model.mape_test_noend],
+                self.model.mape_test_noend,
+                self.model.train_net.outputs],
                 feed_dict={
                     self.model.x_root: x_root,
                     self.model.decode_seqs: decode_seq,
@@ -397,6 +401,9 @@ class Seq2Seq_Controller(Controller):
                 })
 
             all_loss += np.array(results[:7])
+
+            for i in range(config.batch_size):
+                prediction.write(str(results[7][i][0][1]) + '\r\n')
 
             if cstep % 100 == 0 and cstep > 0:
                 print(
@@ -410,6 +417,8 @@ class Seq2Seq_Controller(Controller):
             (epoch, time.time() - start_time, all_loss / valid_steps)
         )
         logger.add_log(epoch, all_loss / valid_steps)
+
+        prediction.close()
 
         return all_loss
 
@@ -496,8 +505,13 @@ class Seq2Seq_Controller(Controller):
         return all_loss, time_loss, pathpred
 
     def controller_train(self, tepoch=config.epoch):
-        train_data = np.genfromtxt('../data/800r_train_2.txt')
-        val_data = np.genfromtxt('../data/800r_test.txt')
+        val_data = np.genfromtxt('../data/800r_test_smooth.txt')
+        train_data = np.genfromtxt('../data/800r_train_2_smooth.txt')
+        # val_data = pd.read_csv('../data/800r_test_smooth.csv')
+        # train_data = pd.read_csv('../data/800r_train_2_smooth.csv')
+        print("train_shape", train_data.shape)
+        train_data = train_data[:,:-1]
+        print("train_shape", train_data.shape)
 
         last_save_epoch = self.base_epoch
         global_epoch = self.base_epoch + 1
@@ -517,6 +531,7 @@ class Seq2Seq_Controller(Controller):
         # logger_test = log.Logger(columns=["mapev"] + list(range(15, 121, 15)))
 
         for epoch in range(tepoch + 1):
+        # for epoch in range(1):
 
             self.__train__(global_epoch, train_data, logger_train)
 
@@ -524,12 +539,14 @@ class Seq2Seq_Controller(Controller):
                 self.__valid__(global_epoch, val_data, logger_valid)
                 # self.__test__(global_epoch, root_data[:, -config.valid_length:, :], logger_test, pathlist)
 
+            '''
             if global_epoch > self.base_epoch and global_epoch % config.save_p_epoch == 0:
                 self.save_model(
                     path=self.model_save_dir,
                     global_step=global_epoch
                 )
                 last_save_epoch = global_epoch
+            '''
 
             logger_train.save(self.log_save_dir + config.global_start_time + "_train.csv")
             logger_valid.save(self.log_save_dir + config.global_start_time + "_valid.csv")
