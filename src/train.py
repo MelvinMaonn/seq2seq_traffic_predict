@@ -22,7 +22,7 @@ import src.utils as utils
 import src.config as config
 import src.dataloader as dataloader
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 
 class Controller():
@@ -507,11 +507,6 @@ class Seq2Seq_Controller(Controller):
     def controller_train(self, tepoch=config.epoch):
         val_data = np.genfromtxt('../data/800r_test_smooth.txt')
         train_data = np.genfromtxt('../data/800r_train_2_smooth.txt')
-        # val_data = pd.read_csv('../data/800r_test_smooth.csv')
-        # train_data = pd.read_csv('../data/800r_train_2_smooth.csv')
-        print("train_shape", train_data.shape)
-        train_data = train_data[:,:-1]
-        print("train_shape", train_data.shape)
 
         last_save_epoch = self.base_epoch
         global_epoch = self.base_epoch + 1
@@ -539,14 +534,12 @@ class Seq2Seq_Controller(Controller):
                 self.__valid__(global_epoch, val_data, logger_valid)
                 # self.__test__(global_epoch, root_data[:, -config.valid_length:, :], logger_test, pathlist)
 
-            '''
             if global_epoch > self.base_epoch and global_epoch % config.save_p_epoch == 0:
                 self.save_model(
                     path=self.model_save_dir,
                     global_step=global_epoch
                 )
                 last_save_epoch = global_epoch
-            '''
 
             logger_train.save(self.log_save_dir + config.global_start_time + "_train.csv")
             logger_valid.save(self.log_save_dir + config.global_start_time + "_valid.csv")
