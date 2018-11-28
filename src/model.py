@@ -99,9 +99,10 @@ class Spacial_Model():
 
         preds = tf.reshape(outputs_noend, [-1])
         labels = tf.reshape(target_seqs_noend, [-1])
+
         self.rmse_train_noend = metrics.masked_rmse_tf(preds, labels, 0)
         # self.mae_train_noend = tf.reduce_mean(tf.abs(tf.reshape(self.train_net.outputs, [-1]) - tf.reshape(self.target_seqs, [-1])))
-        self.mae_train_noend = metrics.masked_mae_tf(tf.reshape(self.train_net.outputs, [-1]), tf.reshape(self.target_seqs, [-1]), 0)
+        self.mae_train_noend = metrics.masked_mae_tf(preds, labels, 0)
         self.mape_train_noend = metrics.masked_mape_tf(preds, labels, 0)
         # test loss
         '''
@@ -117,8 +118,8 @@ class Spacial_Model():
         self.mae_test_noend = self.mae_train_noend
         self.mape_test_noend = self.mape_train_noend
         # adaptive train loss
-        self.train_loss = self.nmse_train_loss
-        self.test_loss = self.nmse_test_loss
+        self.train_loss = self.mae_train_noend
+        self.test_loss = self.mae_test_noend
 
     def __create_training_op__(self):
         self.learning_rate = tf.train.exponential_decay(

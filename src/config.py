@@ -6,7 +6,7 @@ in_seq_length   = 12
 out_seq_length  = 1
 num_neighbour   = 10
 
-pred_time = 30
+pred_time = 2
 
 dim_hidden      = 512
 query_dim_hidden = 128
@@ -17,7 +17,7 @@ dim_features_info = 131
 dim_features_time = 6
 dim_features    = dim_features_info + dim_features_time
 
-road_num = 655
+road_num = 1
 
 full_length     = 61 * 24 * 4
 valid_length    = 2900
