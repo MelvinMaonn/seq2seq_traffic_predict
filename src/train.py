@@ -22,7 +22,7 @@ import src.utils as utils
 import src.config as config
 import src.dataloader as dataloader
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '5'
 
 
 class Controller():
@@ -328,6 +328,8 @@ class Seq2Seq_Controller(Controller):
         step_time = time.time()
         train_steps = (len(root_data) - config.in_seq_length - config.out_seq_length + 1) // config.batch_size
 
+        prediction = open("../prediction/" + config.global_start_time + "_prediction_train.txt", 'w')
+
         for cstep in range(train_steps):
 
             x_root, decode_seq, target_seq = dataloader.get_train_data(root_data, cstep * config.batch_size)
@@ -343,7 +345,9 @@ class Seq2Seq_Controller(Controller):
                 self.model.mae_train_noend,
                 self.model.mape_train_noend,
                 self.model.learning_rate,
-                self.model.optim],
+                self.model.optim,
+                self.model.train_net.outputs,
+                self.model.target_seqs],
                 feed_dict={
                     self.model.x_root: x_root,
                     self.model.decode_seqs: decode_seq,
@@ -351,21 +355,26 @@ class Seq2Seq_Controller(Controller):
                     self.model.global_step: global_step
                 })
 
-            all_loss += np.array(results[:-2])
+            all_loss += np.array(results[:-4])
+
+            for i in range(config.batch_size):
+                prediction.write(str(results[9][i][0][0]) + ' ' + str(results[10][i][0][0]) + '\r\n')
 
             if cstep % 60 == 0 and cstep > 0:
                 print(
                     "[Train] Epoch: [%3d][%4d/%4d] time: %.4f, lr: %.8f, loss: %s" %
-                    (epoch, cstep, train_steps, time.time() - step_time, results[-2], all_loss / (cstep + 1))
+                    (epoch, cstep, train_steps, time.time() - step_time, results[-4], all_loss / (cstep + 1))
                 )
                 step_time = time.time()
                 logger.add_log(global_step, all_loss / (cstep + 1))
 
         print(
             "[Train Sum] Epoch: [%3d] time: %.4f, lr: %.8f, loss: %s" %
-            (epoch, time.time() - start_time, results[-2], all_loss / train_steps)
+            (epoch, time.time() - start_time, results[-4], all_loss / train_steps)
         )
         logger.add_log(global_step, all_loss / train_steps)
+
+        prediction.close()
 
         return all_loss
 
@@ -377,12 +386,14 @@ class Seq2Seq_Controller(Controller):
         step_time = time.time()
         valid_steps = (len(root_data) - config.in_seq_length - config.out_seq_length + 1) // config.batch_size
 
-        prediction = open("../prediction/" + config.global_start_time + "_prediction.txt", 'w')
+        prediction = open("../prediction/" + config.global_start_time + "_prediction_test.txt", 'w')
+        x_txt = open("../prediction/" + config.global_start_time + "_x.txt", 'w')
+        pred_list = []
 
         for cstep in range(valid_steps):
 
             x_root, decode_seq, target_seq = dataloader.get_train_data(root_data, cstep * config.batch_size)
-
+            x_txt.write(str(x_root) + '\r\n')
             global_step = cstep + epoch * valid_steps
 
             results = self.sess.run([
@@ -393,7 +404,8 @@ class Seq2Seq_Controller(Controller):
                 self.model.rmse_test_noend,
                 self.model.mae_test_noend,
                 self.model.mape_test_noend,
-                self.model.train_net.outputs],
+                self.model.train_net.outputs,
+                self.model.target_seqs],
                 feed_dict={
                     self.model.x_root: x_root,
                     self.model.decode_seqs: decode_seq,
@@ -401,9 +413,12 @@ class Seq2Seq_Controller(Controller):
                 })
 
             all_loss += np.array(results[:7])
+            # print(results[7][0][0])
+            # print(results[7][0][1])
 
             for i in range(config.batch_size):
-                prediction.write(str(results[7][i][0][1]) + '\r\n')
+                prediction.write(str(results[7][i][0][1]) + ' ' + str(results[8][i][0][1]) + '\r\n')
+                pred_list.append(results[7][i][0])
 
             if cstep % 100 == 0 and cstep > 0:
                 print(
@@ -419,6 +434,10 @@ class Seq2Seq_Controller(Controller):
         logger.add_log(epoch, all_loss / valid_steps)
 
         prediction.close()
+        x_txt.close()
+        df = pd.DataFrame(pred_list)
+
+        df.to_csv("../prediction/" + config.global_start_time + "_prediction.csv", index=False, header=False)
 
         return all_loss
 
@@ -505,13 +524,12 @@ class Seq2Seq_Controller(Controller):
         return all_loss, time_loss, pathpred
 
     def controller_train(self, tepoch=config.epoch):
-        val_data = np.genfromtxt('../data/800r_test_smooth.txt')
-        train_data = np.genfromtxt('../data/800r_train_2_smooth.txt')
+        val_data = np.genfromtxt('../data/100r_test.txt')
+        train_data = np.genfromtxt('../data/100r_train_2.txt')
         # val_data = pd.read_csv('../data/800r_test_smooth.csv')
         # train_data = pd.read_csv('../data/800r_train_2_smooth.csv')
-        print("train_shape", train_data.shape)
-        train_data = train_data[:,:-1]
-        print("train_shape", train_data.shape)
+        train_data = np.reshape(train_data, [len(train_data), config.road_num])
+        val_data = np.reshape(val_data, [len(val_data), config.road_num])
 
         last_save_epoch = self.base_epoch
         global_epoch = self.base_epoch + 1
@@ -539,14 +557,12 @@ class Seq2Seq_Controller(Controller):
                 self.__valid__(global_epoch, val_data, logger_valid)
                 # self.__test__(global_epoch, root_data[:, -config.valid_length:, :], logger_test, pathlist)
 
-            '''
             if global_epoch > self.base_epoch and global_epoch % config.save_p_epoch == 0:
                 self.save_model(
                     path=self.model_save_dir,
                     global_step=global_epoch
                 )
                 last_save_epoch = global_epoch
-            '''
 
             logger_train.save(self.log_save_dir + config.global_start_time + "_train.csv")
             logger_valid.save(self.log_save_dir + config.global_start_time + "_valid.csv")
@@ -579,23 +595,6 @@ class Seq2Seq_Controller(Controller):
 
 
 if __name__ == "__main__":
-    '''
-
-    with tf.Graph().as_default() as graph:
-        tl.layers.clear_layers_name()
-        mdl = model.Spacial_Model(
-            model_name="spacial_model",
-            start_learning_rate=0.001,
-            decay_steps=2e4,
-            decay_rate=0.5,
-        )
-        ctl = Controller(model=mdl, base_epoch=100)
-        # ctl.controller_train()
-        # ctl.controller_train(tepoch=2)
-        ctl.controller_test()
-        ctl.sess.close()
-
-    '''
 
     with tf.Graph().as_default() as graph:
         tl.layers.clear_layers_name()
