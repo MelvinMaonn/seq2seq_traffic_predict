@@ -413,8 +413,6 @@ class Seq2Seq_Controller(Controller):
                 })
 
             all_loss += np.array(results[:7])
-            # print(results[7][0][0])
-            # print(results[7][0][1])
 
             for i in range(config.batch_size):
                 prediction.write(str(results[7][i][0][1]) + ' ' + str(results[8][i][0][1]) + '\r\n')
@@ -557,12 +555,14 @@ class Seq2Seq_Controller(Controller):
                 self.__valid__(global_epoch, val_data, logger_valid)
                 # self.__test__(global_epoch, root_data[:, -config.valid_length:, :], logger_test, pathlist)
 
+            '''
             if global_epoch > self.base_epoch and global_epoch % config.save_p_epoch == 0:
                 self.save_model(
                     path=self.model_save_dir,
                     global_step=global_epoch
                 )
                 last_save_epoch = global_epoch
+            '''
 
             logger_train.save(self.log_save_dir + config.global_start_time + "_train.csv")
             logger_valid.save(self.log_save_dir + config.global_start_time + "_valid.csv")
