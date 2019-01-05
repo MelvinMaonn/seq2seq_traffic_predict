@@ -218,9 +218,9 @@ class Seq2Seq_Model(Spacial_Model):
                 encode_sequence_length=tl.layers.retrieve_seq_length_op(net_encode.outputs),
                 decode_sequence_length=tl.layers.retrieve_seq_length_op(net_decode.outputs),
                 initial_state_encode=None,
-                # dropout=(0.8 if is_train else None),
-                dropout=None,
-                n_layer=2,
+                dropout=(0.5 if is_train else None),
+                # dropout=None,
+                n_layer=5,
                 return_seq_2d=True,
                 name='seq2seq'
             )

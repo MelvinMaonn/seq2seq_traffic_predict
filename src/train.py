@@ -1,28 +1,23 @@
 
 import os
-import matplotlib
 
 # matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 # import seaborn as sns
 import time
 import numpy as np
 import pandas as pd
-import sklearn
 import random
-import sklearn.utils
 import tensorflow as tf
 import tensorlayer as tl
-from tensorlayer.prepro import threading_data
-from datetime import datetime, timedelta
 
 import src.log as log
 import src.model as model
 import src.utils as utils
 import src.config as config
 import src.dataloader as dataloader
+from src.config import VAL_DATA_PATH, TRAIN_SHUFFLE_DATA_PATH
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '5'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
 class Controller():
@@ -326,13 +321,17 @@ class Seq2Seq_Controller(Controller):
 
         start_time = time.time()
         step_time = time.time()
-        train_steps = (len(root_data) - config.in_seq_length - config.out_seq_length + 1) // config.batch_size
+        train_steps = (len(root_data['x']) - config.in_seq_length - config.out_seq_length - config.pred_time + 1 + 1) // config.batch_size
 
         prediction = open("../prediction/" + config.global_start_time + "_prediction_train.txt", 'w')
 
         for cstep in range(train_steps):
 
-            x_root, decode_seq, target_seq = dataloader.get_train_data(root_data, cstep * config.batch_size)
+            x_root, decode_seq, target_seq = dataloader.get_data(root_data, cstep * config.batch_size)
+
+            # x_root = np.reshape(x_root, [-1, config.in_seq_length*config.road_num])
+            # x_root = sklearn.preprocessing.scale(x_root)
+            # x_root = np.reshape(x_root, [-1, config.in_seq_length, config.road_num])
 
             global_step = cstep + epoch * train_steps
 
@@ -384,7 +383,9 @@ class Seq2Seq_Controller(Controller):
 
         start_time = time.time()
         step_time = time.time()
-        valid_steps = (len(root_data) - config.in_seq_length - config.out_seq_length + 1) // config.batch_size
+        valid_steps = (len(root_data['x']) - config.in_seq_length - config.out_seq_length - config.pred_time + 1 + 1) // config.batch_size
+        print(len(root_data['x']))
+        print(valid_steps)
 
         prediction = open("../prediction/" + config.global_start_time + "_prediction_test.txt", 'w')
         x_txt = open("../prediction/" + config.global_start_time + "_x.txt", 'w')
@@ -392,9 +393,13 @@ class Seq2Seq_Controller(Controller):
 
         for cstep in range(valid_steps):
 
-            x_root, decode_seq, target_seq = dataloader.get_train_data(root_data, cstep * config.batch_size)
+            x_root, decode_seq, target_seq = dataloader.get_data(root_data, cstep * config.batch_size)
             x_txt.write(str(x_root) + '\r\n')
             global_step = cstep + epoch * valid_steps
+
+            # x_root = np.reshape(x_root, [-1, config.in_seq_length * config.road_num])
+            # x_root = sklearn.preprocessing.scale(x_root)
+            # x_root = np.reshape(x_root, [-1, config.in_seq_length, config.road_num])
 
             results = self.sess.run([
                 self.model.mae_copy,
@@ -522,12 +527,15 @@ class Seq2Seq_Controller(Controller):
         return all_loss, time_loss, pathpred
 
     def controller_train(self, tepoch=config.epoch):
-        val_data = np.genfromtxt('../data/100r_test.txt')
-        train_data = np.genfromtxt('../data/100r_train_2.txt')
+        # val_data = np.genfromtxt(VAL_DATA_PATH)
+        # train_data = np.genfromtxt(TRAIN_DATA_PATH)
         # val_data = pd.read_csv('../data/800r_test_smooth.csv')
         # train_data = pd.read_csv('../data/800r_train_2_smooth.csv')
-        train_data = np.reshape(train_data, [len(train_data), config.road_num])
-        val_data = np.reshape(val_data, [len(val_data), config.road_num])
+        # train_data = np.reshape(train_data, [len(train_data), config.road_num])
+        # val_data = np.reshape(val_data, [len(val_data), config.road_num])
+
+        val_data = np.load(VAL_DATA_PATH)
+        train_data = np.load(TRAIN_SHUFFLE_DATA_PATH)
 
         last_save_epoch = self.base_epoch
         global_epoch = self.base_epoch + 1
@@ -601,8 +609,8 @@ if __name__ == "__main__":
         mdl = model.Seq2Seq_Model(
             model_name="seq2seq_model",
             start_learning_rate=0.001,
-            decay_steps=1400,
-            decay_rate=0.9,
+            decay_steps=2e3,
+            decay_rate=0.5,
         )
         ctl = Seq2Seq_Controller(model=mdl, base_epoch=-1)
         ctl.controller_train()

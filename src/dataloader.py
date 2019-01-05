@@ -25,6 +25,21 @@ def get_train_data(root_data, start):
 
     return minibatch_x_root, minibatch_decode_seq, minibatch_target_seq
 
+def get_data(root_data, start):
+    minibatch_x_root = root_data['x'][start:start+config.batch_size]
+    minibatch_y_root = root_data['y'][start:start+config.batch_size, config.pred_time-1:config.pred_time, :]
+
+    minibatch_decode_seq = np.zeros((minibatch_y_root.shape[0], minibatch_y_root.shape[1] + 1, minibatch_y_root.shape[2]))
+    minibatch_target_seq = np.zeros((minibatch_y_root.shape[0], minibatch_y_root.shape[1] + 1, minibatch_y_root.shape[2]))
+
+    minibatch_decode_seq[:, 1:, :] = minibatch_y_root
+    minibatch_target_seq[:, :-1, :] = minibatch_y_root
+
+    minibatch_decode_seq[:, 0, :] = config.start_id
+    minibatch_target_seq[:, -1, :] = config.end_id
+
+    return minibatch_x_root, minibatch_decode_seq, minibatch_target_seq
+
 
 class StandardScaler:
     """
